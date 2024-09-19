@@ -1316,6 +1316,12 @@ void GraphicsWindowX11::swapBuffersImplementation()
             glXWaitVideoSyncSGI(1, 0, &counter);
         }
 #endif
+        static bool init = false;
+        if (_traits.valid() && _traits->swapGroupEnabled && !init) {
+            setSwapGroup(_traits->swapGroupEnabled, _traits->swapGroup, _traits->swapBarrier);
+            init = true;
+        }
+
         glXSwapBuffers( _display, _window );
     #endif
 
@@ -1766,6 +1772,40 @@ void GraphicsWindowX11::transformMouseXY(float& x, float& y)
         y = eventState->getYmin() + (eventState->getYmax()-eventState->getYmin())*y/float(_traits->height);
     }
 }
+
+#ifndef OSG_USE_EGL
+void GraphicsWindowX11::setSwapGroup(bool on, GLuint group, GLuint barrier)
+{
+    if (_traits.valid())
+    {
+        _traits->swapGroupEnabled = on;
+        _traits->swapGroup        = group;
+        _traits->swapBarrier      = barrier;
+    }
+
+    typedef Bool (GL_APIENTRY *PFNGLXJOINSWAPGROUPNVPROC) (Display *dpy, GLXDrawable drawable, GLuint group);
+    PFNGLXJOINSWAPGROUPNVPROC glXJoinSwapGroupNV = (PFNGLXJOINSWAPGROUPNVPROC)glXGetProcAddress( (GLubyte *)"glXJoinSwapGroupNV" );
+
+    typedef Bool (GL_APIENTRY *PFNGLXBINDSWAPBARRIERNVPROC) (Display *dpy, GLuint group, GLuint barrier);
+    PFNGLXBINDSWAPBARRIERNVPROC glXBindSwapBarrierNV = (PFNGLXBINDSWAPBARRIERNVPROC)glXGetProcAddress( (GLubyte *)"glXBindSwapBarrierNV" );
+
+    if ((!glXJoinSwapGroupNV) || (!glXBindSwapBarrierNV))
+    {
+        OSG_INFO << "GraphicsWindowX11::setSwapGroup(bool, GLuint, GLuint) not supported" << std::endl;
+        return;
+    }
+
+    int swapGroup = (on ? group : 0);
+    Bool resultJoin = glXJoinSwapGroupNV(_display, _window, swapGroup);
+    OSG_INFO << "GraphicsWindowX11::glXJoinSwapGroupNV (" << swapGroup
+             << ") returned " << resultJoin << std::endl;
+
+    int swapBarrier = (on ? barrier : 0);
+    Bool resultBind = glXBindSwapBarrierNV(_display, swapGroup, swapBarrier);
+    OSG_INFO << "GraphicsWindowX11::glXBindSwapBarrierNV (" << swapGroup << ", "
+             << swapBarrier << ") returned " << resultBind << std::endl;
+}
+#endif
 
 void GraphicsWindowX11::adaptKey(XKeyEvent& keyevent, int& keySymbol, int& unmodifiedKeySymbol)
 {

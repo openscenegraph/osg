@@ -125,6 +125,9 @@ class OSGVIEWER_EXPORT GraphicsWindowX11 : public osgViewer::GraphicsWindow, pub
         /** Set mouse cursor to a specific shape.*/
         virtual void setCursor(MouseCursor cursor);
 
+        /** Set swap group. */
+        virtual void setSwapGroup(bool on, GLuint group, GLuint barrier);
+
         /** WindowData is used to pass in the X11 window handle attached the GraphicsContext::Traits structure. */
         struct WindowData : public osg::Referenced
         {
